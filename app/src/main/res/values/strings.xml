@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Poshak Waale</string>
+
+    <string name="copy_right" translatable="false">Copyrights © %1$d</string>
+
+    <string name="razor_key_id">rzp_test_dhl8Hg5WeesQqd</string>
+    <string name="razor_key_secret">YLxsbAR2gMmVsbu77jkDZylQ</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+</resources>
