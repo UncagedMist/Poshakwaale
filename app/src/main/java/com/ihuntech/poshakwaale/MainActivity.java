@@ -2,6 +2,7 @@ package com.ihuntech.poshakwaale;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -9,8 +10,12 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.ihuntech.poshakwaale.Activity.LoginActivity;
+import com.ihuntech.poshakwaale.Activity.RegisterActivity;
+
 public class MainActivity extends AppCompatActivity {
 
+    @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -23,10 +28,19 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-        findViewById(R.id.add_btn).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.btnLogin).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startActivity(new Intent(MainActivity.this,HomeActivity.class));
+                startActivity(new Intent(MainActivity.this, HomeActivity.class));
+
+//                startActivity(new Intent(MainActivity.this, LoginActivity.class));
+            }
+        });
+
+        findViewById(R.id.btnSignup).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(MainActivity.this, RegisterActivity.class));
             }
         });
 

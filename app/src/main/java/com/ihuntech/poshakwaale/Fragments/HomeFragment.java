@@ -2,6 +2,7 @@ package com.ihuntech.poshakwaale.Fragments;
 
 import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
+import android.content.Intent;
 import android.graphics.Paint;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,20 +23,27 @@ import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.ihuntech.poshakwaale.Activity.AllProductsActivity;
+import com.ihuntech.poshakwaale.Activity.CartActivity;
 import com.ihuntech.poshakwaale.Adapter.CategoryAdapter;
 import com.ihuntech.poshakwaale.Adapter.ProductAdapter;
 import com.ihuntech.poshakwaale.Common.Common;
 import com.ihuntech.poshakwaale.Interface.CategoryClickListener;
+import com.ihuntech.poshakwaale.Model.Banner;
 import com.ihuntech.poshakwaale.Model.Category;
 import com.ihuntech.poshakwaale.Model.Product;
 import com.ihuntech.poshakwaale.R;
 import com.ihuntech.poshakwaale.Remote.IMyAPI;
 import com.squareup.picasso.Picasso;
 
+import org.imaginativeworld.whynotimagecarousel.ImageCarousel;
+import org.imaginativeworld.whynotimagecarousel.model.CarouselItem;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import am.appwise.components.ni.NoInternetDialog;
 import de.hdodenhof.circleimageview.CircleImageView;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
@@ -43,24 +51,27 @@ import io.reactivex.functions.Consumer;
 import io.reactivex.schedulers.Schedulers;
 
 
-public class HomeFragment extends Fragment implements CategoryClickListener {
+public class HomeFragment extends Fragment {
 
-    RecyclerView recyclerCategory, recyclerProduct;
-    TextView txtName, txtCategory;
+    TextView txtName;
 
     EditText edtProduct;
 
     CircleImageView imgProfile;
 
-    List<Category> categoryList = new ArrayList<>();
+    List<Product> localDataSource = new ArrayList<>();
+
+    ProductAdapter searchAdapter;
 
     CompositeDisposable compositeDisposable = new CompositeDisposable();
 
     IMyAPI iMyAPI;
 
-    List<Product> localDataSource = new ArrayList<>();
+    NoInternetDialog noInternetDialog;
 
-    ProductAdapter searchAdapter, adapter;
+    RecyclerView recyclerSearch;
+
+    ImageCarousel carousel;
 
     ProgressDialog dialog;
 
@@ -71,52 +82,89 @@ public class HomeFragment extends Fragment implements CategoryClickListener {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_home, container, false);
 
+        noInternetDialog = new NoInternetDialog.Builder(this).build();
+
         dialog = new ProgressDialog(getContext());
 
         iMyAPI = Common.getAPI();
 
-        recyclerCategory = view.findViewById(R.id.recyclerCategory);
-        recyclerProduct = view.findViewById(R.id.recyclerProduct);
-
         txtName = view.findViewById(R.id.txtName);
-        txtCategory = view.findViewById(R.id.txtCategory);
+        carousel = view.findViewById(R.id.carousel);
 
         edtProduct = view.findViewById(R.id.edtProduct);
         imgProfile = view.findViewById(R.id.imgProfile);
 
+        recyclerSearch = view.findViewById(R.id.recyclerSearch);
+
+        carousel.registerLifecycle(getLifecycle());
+
         txtName.setSelected(true);
 
-        recyclerCategory.setNestedScrollingEnabled(false);
-        recyclerCategory.setHasFixedSize(true);
-        recyclerCategory.setLayoutManager(new LinearLayoutManager(getContext(),LinearLayoutManager.HORIZONTAL,false));
+        recyclerSearch.setNestedScrollingEnabled(false);
+        recyclerSearch.setHasFixedSize(true);
+        recyclerSearch.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        recyclerProduct.setNestedScrollingEnabled(false);
-        recyclerProduct.setHasFixedSize(true);
-//        recyclerProduct.setLayoutManager(new LinearLayoutManager(getContext()));
-        recyclerProduct.setLayoutManager(new GridLayoutManager(getContext(),2));
-
+        loadBanner();
         loadUserDetails();
-        loadCategory();
         loadAllProducts();
+
+        onClicked(view);
 
         edtProduct.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
             }
 
             @Override
             public void onTextChanged(CharSequence text, int i, int i1, int i2) {
                 startSearch(text);
+
+                if (text.toString().length() == 0)  {
+                    loadBanner();
+                    recyclerSearch.setVisibility(View.GONE);
+                }
+                else {
+                    recyclerSearch.setVisibility(View.VISIBLE);
+                }
             }
 
             @Override
             public void afterTextChanged(Editable editable) {
-
             }
         });
 
         return view;
+    }
+
+    private void loadBanner() {
+        dialog.setTitle("कृपया प्रतीक्षा करें...");
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+
+        compositeDisposable.add(
+                iMyAPI.getBanner()
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new Consumer<List<Banner>>() {
+                                       @Override
+                                       public void accept(List<Banner> featuredList) throws Exception {
+                                           ArrayList<CarouselItem> carouselItems = new ArrayList<>();
+
+                                           carouselItems.clear();
+
+                                           for (int i = 0; i < featuredList.size(); i++) {
+                                               carouselItems.add(new CarouselItem(
+                                                       new StringBuilder(Common.IMAGE_URL)
+                                                               .append(featuredList.get(i).photo).toString(),
+                                                       Common.stripHtml(featuredList.get(i).title))
+                                               );
+                                           }
+                                           carousel.setData(carouselItems);
+                                           dialog.dismiss();
+                                       }
+                                   }
+                        )
+        );
     }
 
     private void loadUserDetails() {
@@ -139,16 +187,10 @@ public class HomeFragment extends Fragment implements CategoryClickListener {
             }
         }
         searchAdapter = new ProductAdapter(getContext(), result);
-        recyclerProduct.setAdapter(searchAdapter);
+        recyclerSearch.setAdapter(searchAdapter);
     }
 
-
     private void loadAllProducts() {
-        dialog.setTitle("Please wait...");
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-        dialog.show();
-
         compositeDisposable.add(
                 iMyAPI.getAllItems()
                         .subscribeOn(Schedulers.io())
@@ -158,105 +200,48 @@ public class HomeFragment extends Fragment implements CategoryClickListener {
                                        public void accept(List<Product> products) throws Exception {
                                            localDataSource = products;
 
-                                           adapter = new ProductAdapter(getContext(),products);
-
-                                           if (adapter.getItemCount() == 0) {
-                                               recyclerProduct.setVisibility(View.GONE);
-                                           }
-                                           else {
-                                               recyclerProduct.setVisibility(View.VISIBLE);
-                                               recyclerProduct.setAdapter(adapter);
-                                           }
-                                           dialog.dismiss();
-
                                        }
                                    }
                         )
         );
     }
 
-    private void loadCategory() {
-        dialog.setTitle("Please wait...");
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-        dialog.show();
+    private void onClicked(View view) {
+        view.findViewById(R.id.relMore1).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getContext(),AllProductsActivity.class));
+            }
+        });
 
-        compositeDisposable.add(
-                iMyAPI.getCategory()
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Consumer<List<Category>>() {
-                                       @Override
-                                       public void accept(List<Category> categories) throws Exception {
+        view.findViewById(R.id.relMore2).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getContext(),AllProductsActivity.class));
+            }
+        });
 
-                                           categoryList.clear();
+        view.findViewById(R.id.relMore3).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getContext(),AllProductsActivity.class));
+            }
+        });
 
-                                           categoryList = categories;
+        view.findViewById(R.id.linALl).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getContext(),AllProductsActivity.class));
+            }
+        });
 
-                                           CategoryAdapter adapter = new CategoryAdapter(
-                                                   getContext(),
-                                                   categories,
-                                                   HomeFragment.this
-                                           );
-
-                                           recyclerCategory.setAdapter(adapter);
-                                           dialog.dismiss();
-                                       }
-                                   }
-                        )
-        );
+        view.findViewById(R.id.linCart).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getContext(), CartActivity.class));
+            }
+        });
     }
-
-    @Override
-    public void onCategoryClick(int pos) {
-        String id = categoryList.get(pos).id.trim();
-        String name = categoryList.get(pos).name.trim();
-
-        if (name != null)   {
-            txtCategory.setVisibility(View.VISIBLE);
-            txtCategory.setPaintFlags(txtCategory.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
-            txtCategory.setText(name);
-        }
-
-        loadProducts(id);
-    }
-
-    private void loadProducts(String id) {
-        dialog.setTitle("Please wait...");
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-        dialog.show();
-
-        compositeDisposable.add(
-                iMyAPI.getItemByCategory(id)
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Consumer<List<Product>>() {
-                                       @Override
-                                       public void accept(List<Product> products) throws Exception {
-
-                                           localDataSource = products;
-
-                                           adapter = new ProductAdapter(getContext(),products);
-
-                                           if (adapter.getItemCount() == 0) {
-                                               recyclerProduct.setVisibility(View.GONE);
-//                                               imgComing.setVisibility(View.VISIBLE);
-                                           }
-                                           else {
-//                                               imgComing.setVisibility(View.GONE);
-                                               recyclerProduct.setVisibility(View.VISIBLE);
-                                               recyclerProduct.setAdapter(adapter);
-                                           }
-
-                                           dialog.dismiss();
-
-                                       }
-                                   }
-                        )
-        );
-    }
-
 
     @Override
     public void onResume() {
@@ -269,5 +254,6 @@ public class HomeFragment extends Fragment implements CategoryClickListener {
         compositeDisposable.clear();
         compositeDisposable.dispose();
         super.onDestroy();
+        noInternetDialog.onDestroy();
     }
 }
